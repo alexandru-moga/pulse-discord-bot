@@ -1,9 +1,6 @@
 Discord bot helping me for managing members from my HackClub
 
-Type google api details in .env file.
-
-example .env:
-
+Exampe .env
 ```
 TOKEN=
 ADMIN_ROLES=
