@@ -1,84 +1,94 @@
-const { Client, GatewayIntentBits, PermissionsBitField, REST, Routes } = require('discord.js');
-require('dotenv').config();
-const rulesCommand = require('./commands/rules');
-const minecraftServerDetailsCommand = require('./commands/minecraftServerDetails');
+import { Client, GatewayIntentBits, ActivityType, REST, Routes } from 'discord.js';
+import dotenv from 'dotenv';
+import { initSheet } from './sheets.js';
+import * as meCommand from './commands/me.js';
+import * as infoCommand from './commands/info.js';
+import { messageCreate } from './events/messageCreate.js';
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
+dotenv.config();
+
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.MessageContent
+    ]
+});
+
+const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+
+async function registerCommands() {
+    try {
+        // First clear all existing commands
+        await rest.put(
+            Routes.applicationCommands(client.user.id),
+            { body: [] }
+        );
+        console.log('Cleared all existing commands');
+
+        // Then register new commands
+        const commands = [
+            {
+                name: 'me',
+                description: 'Vezi profilul tău'
+            },
+            {
+                name: 'info',
+                description: 'Vezi informații despre un membru',
+                options: [{
+                    name: 'user',
+                    description: 'Membrul vizat',
+                    type: 6,
+                    required: true
+                }]
+            }
+        ];
+
+        await rest.put(
+            Routes.applicationCommands(client.user.id),
+            { body: commands }
+        );
+        console.log('Successfully registered new commands');
+    } catch (error) {
+        console.error('Command registration error:', error);
+    }
+}
+
 
 client.once('ready', async () => {
+    await initSheet();
     console.log(`Logged in as ${client.user.tag}!`);
+    
+    client.user.setActivity({ 
+      name: 'hackclub.com',
+      type: ActivityType.Watching
+    });
+    
+    await registerCommands();
+  });
 
-    const commands = [
-        {
-            name: 'message',
-            description: 'Send a message to a specified channel',
-            options: [
-                {
-                    name: 'type',
-                    type: 3,
-                    description: 'The type of message to send (e.g., rules or minecraft-server)',
-                    required: true,
-                    choices: [
-                        { name: 'rules', value: 'rules' },
-                        { name: 'minecraft-server', value: 'minecraft-server' },
-                    ],
-                },
-                {
-                    name: 'channel',
-                    type: 7,
-                    description: 'The channel to send the message to',
-                    required: true,
-                },
-            ],
-        },
-    ];
-
-    const rest = new REST({ version: '10' }).setToken(process.env.BOT_TOKEN);
-    try {
-        console.log('Started refreshing application (/) commands.');
-
-        const guildId = process.env.DISCORD_CHANNEL_ID;
-        if (!guildId) {
-            throw new Error('DISCORD_CHANNEL_ID is not defined in the environment variables.');
-        }
-
-        await rest.put(
-            Routes.applicationGuildCommands(client.user.id, guildId),
-            { body: [] },
-        );
-
-        await rest.put(
-            Routes.applicationGuildCommands(client.user.id, guildId),
-            { body: commands },
-        );
-
-        console.log('Successfully reloaded application (/) commands.');
-    } catch (error) {
-        console.error(error);
-    }
-});
-
-client.on('interactionCreate', async (interaction) => {
+client.on('interactionCreate', async interaction => {
     if (!interaction.isCommand()) return;
 
-    const { commandName, options, member } = interaction;
-
-    if (commandName === 'message') {
-        const type = options.getString('type');
-        const channel = options.getChannel('channel');
-
-        if (!member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+    try {
+        switch(interaction.commandName) {
+            case 'me':
+                await meCommand.execute(interaction);
+                break;
+            case 'info':
+                await infoCommand.execute(interaction);
+                break;
         }
-
-        if (type === 'rules') {
-            await rulesCommand.execute(channel);
-            await interaction.reply({ content: `Rules have been sent to ${channel}.`, ephemeral: true });
-        } else if (type === 'minecraft-server') {
-            await minecraftServerDetailsCommand.execute(channel);
-            await interaction.reply({ content: `Minecraft server details have been sent to ${channel}.`, ephemeral: true });
-        }
+    } catch (error) {
+        console.error('Command error:', error);
+        interaction.reply({ 
+            content: 'An error occurred', 
+            flags: 64 
+        });
     }
 });
 
-client.login(process.env.BOT_TOKEN);
+client.on('messageCreate', messageCreate);
+
+client.login(process.env.TOKEN);
