@@ -1,4 +1,4 @@
-Discord bot helping me for managing members from my HackClub
+Discord bot helping me for managing members from my HackClub club.
 
 Exampe .env
 ```
@@ -9,6 +9,12 @@ GOOGLE_CLIENT_EMAIL=
 GOOGLE_PRIVATE_KEY=
 ```
 
-This bot need the following node packages: discord.js dotenv google-spreadsheet google-auth-library
+This bot need the following node packages: 
+```
+discord.js
+dotenv
+google-spreadsheet
+google-auth-library
+```
 
-More changes near furute
+More changes near future!
