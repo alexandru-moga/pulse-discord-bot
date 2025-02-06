@@ -20,6 +20,13 @@ export async function execute(interaction) {
       `Data înscrierii: ${userData.applyDate}`,
       `Funcție: ${userData.functie}`,
       `Membru HCB: ${userData.hcb}`,
+      `Descriere: ${userData.descriere}`,
+
+      `\n**Evenimente** 🎉`,
+      ...(userData.events.length > 0 
+          ? userData.events.map(e => `• ${e}`)
+          : ['Niciun eveniment înscris'])
+      ,
       `\n**Contact** 📞`,
       `Email: ${userData.email}`,
       `Telefon: ${userData.telefon}`

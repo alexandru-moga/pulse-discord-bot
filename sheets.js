@@ -23,6 +23,17 @@ export async function getUserData(discordId) {
   const userRow = rows.find(row => row.get('DiscordID') === discordId);
   if (!userRow) return null;
 
+  // Identifică coloanele de evenimente (excluzând coloanele standard)
+  const eventColumns = sheet.headerValues.filter(col => 
+    !['DiscordID', 'Nume', 'Prenume', 'Scoala', 'HCB', 'DataNasterii', 
+      'Clasa', 'Email', 'Telefon', 'Descriere', 'ApplyDate', 'Functie'].includes(col)
+  );
+
+  // Colectează evenimentele la care participă utilizatorul
+  const events = eventColumns
+    .filter(event => userRow.get(event) === 'TRUE')
+    .map(event => event);
+
   return {
     nume: userRow.get('Nume'),
     prenume: userRow.get('Prenume'),
@@ -34,6 +45,7 @@ export async function getUserData(discordId) {
     telefon: userRow.get('Telefon'),
     descriere: userRow.get('Descriere'),
     applyDate: userRow.get('ApplyDate'),
-    functie: userRow.get('Functie')
+    functie: userRow.get('Functie'),
+    events
   };
 }

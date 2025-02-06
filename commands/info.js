@@ -14,17 +14,24 @@ export async function execute(interaction) {
     }
 
     const response = [
-        `**Profil membru** 📋`,
-        `Nume: ${userData.nume} ${userData.prenume}`,
-        `Discord: ${user.tag}`,
-        `Școală: ${userData.scoala}`,
-        `Clasa: ${userData.clasa}`,
-        `Funcție: ${userData.functie}`,
-        `Banca: ${userData.banca}`,
-        `\n**Date contact** 📞`,
-        `Email: ${userData.email}`,
-        `Telefon: ${userData.telefon}`
-    ].join('\n');
+      `**Profil Membru** 👤`,
+      `Nume: ${userData.nume} ${userData.prenume}`,
+      `Școală: ${userData.scoala}`,
+      `Clasa: ${userData.clasa}`,
+      `Data nașterii: ${userData.dataNasterii}`,
+      `Data înscrierii: ${userData.applyDate}`,
+      `Funcție: ${userData.functie}`,
+      `Membru HCB: ${userData.hcb}`,
+      `Descriere: ${userData.descriere}`,
+      `\n**Evenimente** 🎉`,
+      ...(userData.events.length > 0 
+          ? userData.events.map(e => `• ${e}`)
+          : ['Niciun eveniment înscris'])
+      ,
+      `\n**Contact** 📞`,
+      `Email: ${userData.email}`,
+      `Telefon: ${userData.telefon}`
+  ].join('\n');  
 
     await interaction.reply({
       content: response,
