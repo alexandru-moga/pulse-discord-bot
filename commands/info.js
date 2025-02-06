@@ -1,4 +1,14 @@
 import { getUserData } from '../sheets.js';
+import { SlashCommandBuilder } from '@discordjs/builders';
+
+export const data = new SlashCommandBuilder()
+    .setName('info')
+    .setDescription('Vezi informații despre un membru')
+    .addUserOption(option => 
+        option.setName('user')
+            .setDescription('Membrul vizat')
+            .setRequired(true)
+    );
 
 export async function execute(interaction) {
   const user = interaction.options.getUser('user');

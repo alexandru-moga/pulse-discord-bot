@@ -1,8 +1,9 @@
 import { Client, GatewayIntentBits, ActivityType, REST, Routes } from 'discord.js';
 import dotenv from 'dotenv';
-import { initSheet } from './sheets.js';
+import { initSheet, initializeCoreRoles, syncRoles } from './sheets.js';
 import * as meCommand from './commands/me.js';
 import * as infoCommand from './commands/info.js';
+import * as syncCommand from './commands/sync.js';
 import { messageCreate } from './events/messageCreate.js';
 
 dotenv.config();
@@ -17,56 +18,62 @@ const client = new Client({
 });
 
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+let syncInterval;
 
 async function registerCommands() {
     try {
-        // First clear all existing commands
-        await rest.put(
-            Routes.applicationCommands(client.user.id),
-            { body: [] }
-        );
-        console.log('Cleared all existing commands');
-
-        // Then register new commands
+        // Get all command data properly
         const commands = [
-            {
-                name: 'me',
-                description: 'Vezi profilul tău'
-            },
-            {
-                name: 'info',
-                description: 'Vezi informații despre un membru',
-                options: [{
-                    name: 'user',
-                    description: 'Membrul vizat',
-                    type: 6,
-                    required: true
-                }]
-            }
+            (await import('./commands/me.js')).data.toJSON(),
+            (await import('./commands/info.js')).data.toJSON(),
+            (await import('./commands/sync.js')).data.toJSON()
         ];
+
+        console.log('Registering commands:', commands.map(c => c.name));
 
         await rest.put(
             Routes.applicationCommands(client.user.id),
             { body: commands }
         );
-        console.log('Successfully registered new commands');
+        console.log('Commands registered successfully');
     } catch (error) {
-        console.error('Command registration error:', error);
+        console.error('Command registration failed:', error);
     }
 }
 
+async function syncAllMembers(guild) {
+    try {
+        const members = await guild.members.fetch();
+        let count = 0;
+        
+        for (const [_, member] of members) {
+            await syncRoles(member);
+            count++;
+        }
+        
+        console.log(`Synced roles for ${count} members`);
+    } catch (error) {
+        console.error('Auto-sync error:', error);
+    }
+}
 
 client.once('ready', async () => {
     await initSheet();
     console.log(`Logged in as ${client.user.tag}!`);
     
+    const guild = client.guilds.cache.first();
+    if (guild) {
+        await initializeCoreRoles(guild); // Correct function name
+        console.log('System roles initialized');
+    }
+
     client.user.setActivity({ 
-      name: 'hackclub.com',
-      type: ActivityType.Watching
+        name: 'hackclub.com',
+        type: ActivityType.Watching
     });
     
     await registerCommands();
-  });
+});
 
 client.on('interactionCreate', async interaction => {
     if (!interaction.isCommand()) return;
@@ -79,16 +86,30 @@ client.on('interactionCreate', async interaction => {
             case 'info':
                 await infoCommand.execute(interaction);
                 break;
+            case 'sync':
+                await syncCommand.execute(interaction);
+                break;
+            default:
+                await interaction.reply({ 
+                    content: 'Comandă necunoscută', 
+                    ephemeral: true 
+                });
         }
     } catch (error) {
         console.error('Command error:', error);
-        interaction.reply({ 
-            content: 'An error occurred', 
-            flags: 64 
+        await interaction.reply({ 
+            content: 'A apărut o eroare', 
+            ephemeral: true 
         });
     }
 });
 
 client.on('messageCreate', messageCreate);
+
+// Cleanup on shutdown
+process.on('SIGINT', () => {
+    clearInterval(syncInterval);
+    client.destroy();
+});
 
 client.login(process.env.TOKEN);
