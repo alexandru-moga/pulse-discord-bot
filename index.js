@@ -68,7 +68,7 @@ client.once('ready', async () => {
     }
 
     client.user.setActivity({ 
-        name: 'hackclub.com',
+        name: 'phoenixclub.ro',
         type: ActivityType.Watching
     });
     
