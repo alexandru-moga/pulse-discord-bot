@@ -32,9 +32,9 @@ export async function execute(interaction) {
             `Membru HCB: ${userData.hcb}`,
             `Descriere: ${userData.descriere}`,
             `\n**Evenimente** 🎉`,
-            ...(userData.events.length > 0
-                ? userData.events.map(e => `• ${e}`)
-                : ['Niciun eveniment înscris']),
+            ...(userData.events?.length > 0
+                ? userData.events.map(e => `▸ ${e}`)
+                : ['Niciun eveniment înscris'])
             `\n**Contact** 📞`,
             `Email: ${userData.email}`,
             `Telefon: ${userData.telefon}`

@@ -51,18 +51,20 @@ export async function getUserData(discordId) {
         
         const user = result[0];
         
-        // Parse events from ysws_projects field (assuming it's a comma-separated list)
+        // Parse events from ysws_projects field
         let events = [];
         if (user.ysws_projects) {
-            try {
-                // Try to parse as JSON first
-                events = JSON.parse(user.ysws_projects);
-            } catch (e) {
-                // If not JSON, treat as comma-separated list
-                events = user.ysws_projects.split(',').map(e => e.trim());
-            }
+          try {
+            // Try to parse as JSON first
+            events = JSON.parse(user.ysws_projects);
+          } catch (e) {
+            // If not JSON, treat as comma-separated list
+            events = user.ysws_projects.split(',').map(e => e.trim());
+          }
         }
         
+        events = events.map(formatEventName);
+
         return {
             nume: user.last_name,
             prenume: user.first_name,
@@ -139,6 +141,12 @@ export async function syncRoles(member) {
     }
 }
 
+function formatEventName(event) {
+    return event
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, char => char.toUpperCase());
+  }
+
 async function manageSchoolRole(member, schoolName) {
     if (!schoolName) return;
     
@@ -203,24 +211,26 @@ async function manageStatusRole(member, status) {
 async function manageEventRoles(member, events) {
     const guild = member.guild;
     const currentRoles = member.roles.cache;
-    
-    // Get all existing event roles
-    const eventRoles = guild.roles.cache.filter(r => r.color === ROLE_COLORS.EVENT);
-    
+
+    // Convert event names to proper format
+    const formattedEvents = events.map(event => 
+        event.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
+    );
+
     // Remove event roles that the user shouldn't have
     const rolesToRemove = currentRoles.filter(role => 
         role.color === ROLE_COLORS.EVENT && 
-        !events.includes(role.name)
+        !formattedEvents.includes(role.name)
     );
-    
+
     if (rolesToRemove.size > 0) {
         await member.roles.remove(rolesToRemove);
     }
-    
+
     // Add event roles that the user should have
-    for (const event of events) {
+    for (const event of formattedEvents) {
         let eventRole = guild.roles.cache.find(r => r.name === event);
-        
+
         if (!eventRole) {
             // Create event role if it doesn't exist
             eventRole = await guild.roles.create({
@@ -230,7 +240,7 @@ async function manageEventRoles(member, events) {
             });
             console.log(`Created event role: ${event}`);
         }
-        
+
         if (!currentRoles.has(eventRole.id)) {
             await member.roles.add(eventRole);
         }
