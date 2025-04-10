@@ -1,5 +1,6 @@
 import { getUserData } from '../database.js'; // Changed from sheets.js
 import { SlashCommandBuilder } from '@discordjs/builders';
+import { MessageFlags } from 'discord.js';
 
 export const data = new SlashCommandBuilder()
     .setName('me')
@@ -24,24 +25,25 @@ export async function execute(interaction) {
             `Membru HCB: ${userData.hcb}`,
             `Data nașterii: ${userData.dataNasterii || 'Nespecificată'}`,
             `Data înscrierii: ${userData.applyDate || 'Nespecificată'}`,
+            `Descriere: ${userData.descriere}`,
             `\n**Evenimente participante** 🎉`,
             ...(userData.events?.length > 0
                 ? userData.events.map(e => `▸ ${e}`)
                 : ['Niciun eveniment înscris']),
-            `\n**Date de contact** 📇`,
-            `✉️ Email: ${userData.email || 'Nespecificat'}`,
-            `📱 Telefon: ${userData.telefon || 'Nespecificat'}`
-        ].join('\n');
+                `\n**Contact** 📞`,
+                `Email: ${userData.email}`,
+                `Telefon: ${userData.telefon}`
+              ].join('\n');
         
         await interaction.reply({
             content: response,
-            ephemeral: true
+            flags: MessageFlags.Ephemeral 
         });
     } catch (error) {
         console.error('Eroare la comanda /me:', error);
         await interaction.reply({
             content: '⚠️ A apărut o eroare la încărcarea profilului',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral 
         });
     }
 }

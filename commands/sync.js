@@ -1,5 +1,6 @@
 import { SlashCommandBuilder } from '@discordjs/builders';
 import { syncRoles } from '../database.js'; // Changed from sheets.js
+import { MessageFlags } from 'discord.js';
 
 export const data = new SlashCommandBuilder()
     .setName('sync')
@@ -13,14 +14,16 @@ export async function execute(interaction) {
         });
     }
     
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ 
+        flags: MessageFlags.Ephemeral 
+    });
     try {
         const members = await interaction.guild.members.fetch();
         let count = 0;
         for (const [_, member] of members) {
             await syncRoles(member);
             count++;
-        }
+          }
         
         await interaction.editReply(`✅ Sincronizare completă! Actualizat ${count} membri.`);
     } catch (error) {
