@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from '@discordjs/builders';
-import { syncRoles } from '../sheets.js';
+import { syncRoles } from '../database.js'; // Changed from sheets.js
 
 export const data = new SlashCommandBuilder()
     .setName('sync')
@@ -12,13 +12,11 @@ export async function execute(interaction) {
             ephemeral: true
         });
     }
-
-    await interaction.deferReply({ ephemeral: true });
     
+    await interaction.deferReply({ ephemeral: true });
     try {
         const members = await interaction.guild.members.fetch();
         let count = 0;
-        
         for (const [_, member] of members) {
             await syncRoles(member);
             count++;

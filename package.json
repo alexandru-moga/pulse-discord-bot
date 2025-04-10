@@ -5,6 +5,7 @@
         "dotenv": "^16.4.7",
         "google-auth-library": "^9.15.1",
         "google-spreadsheet": "^4.1.4",
+        "mariadb": "^3.2.3",
         "mysql2": "^3.12.0"
     }
 }
