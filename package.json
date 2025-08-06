@@ -1,15 +1,23 @@
 {
-    "type": "module",
-    "dependencies": {
-        "discord.js": "^14.18.0",
-        "dotenv": "^16.4.7",
-        "google-auth-library": "^9.15.1",
-        "google-spreadsheet": "^4.1.4",
-        "mariadb": "^3.2.3",
-        "mysql2": "^3.12.0"
-    },
+    "name": "pulse-discord-bot",
+    "version": "1.0.0",
+    "description": "Discord bot for Phoenix Club role management",
+    "main": "index.js",
+    "type": "commonjs",
     "scripts": {
-        "start": "node index.js"
-        }
-
+        "start": "node index.js",
+        "dev": "nodemon index.js",
+        "deploy-commands": "node deploy-commands.js"
+    },
+    "dependencies": {
+        "discord.js": "^14.14.1",
+        "dotenv": "^16.0.3",
+        "mysql2": "^3.6.5"
+    },
+    "devDependencies": {
+        "nodemon": "^3.0.2"
+    },
+    "engines": {
+        "node": ">=16.0.0"
+    }
 }

@@ -1,114 +1,200 @@
-import { Client, GatewayIntentBits, ActivityType, REST, Routes } from 'discord.js';
-import dotenv from 'dotenv';
-import { initDatabase, initializeCoreRoles, syncRoles } from './database.js'; // Changed from sheets.js
-import * as meCommand from './commands/me.js';
-import * as infoCommand from './commands/info.js';
-import * as syncCommand from './commands/sync.js';
-import { messageCreate } from './events/messageCreate.js';
+const { Client, Collection, GatewayIntentBits, REST, Routes, ActivityType } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
+const { connectToDatabase, getConnection } = require('./config/database');
+require('dotenv').config();
 
-dotenv.config();
-
+// Create a new client instance with only the necessary intents
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.MessageContent
-    ]
+    ],
 });
 
-const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+// Create a collection for commands
+client.commands = new Collection();
 
-let syncInterval;
+// Load commands
+const commandsPath = path.join(__dirname, 'commands');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
+const commands = [];
+
+for (const file of commandFiles) {
+    const filePath = path.join(commandsPath, file);
+    const command = require(filePath);
+
+    if ('data' in command && 'execute' in command) {
+        client.commands.set(command.data.name, command);
+        commands.push(command.data.toJSON());
+        console.log(`Loaded command: ${command.data.name}`);
+    } else {
+        console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+    }
+}
+
+// Function to get Discord credentials from database
+async function getDiscordCredentials() {
+    try {
+        const db = await getConnection();
+        const query = `
+            SELECT name, value 
+            FROM settings 
+            WHERE name IN ('discord_bot_token', 'discord_client_id', 'discord_guild_id', 'discord_client_secret')
+        `;
+        const [rows] = await db.execute(query);
+
+        const settings = {};
+        rows.forEach(row => {
+            settings[row.name] = row.value;
+        });
+
+        // Validate required settings
+        if (!settings.discord_bot_token) {
+            throw new Error('Discord bot token not found in database settings');
+        }
+        if (!settings.discord_client_id) {
+            throw new Error('Discord client ID not found in database settings');
+        }
+        if (!settings.discord_guild_id) {
+            throw new Error('Discord guild ID not found in database settings');
+        }
+
+        return {
+            token: settings.discord_bot_token,
+            clientId: settings.discord_client_id,
+            guildId: settings.discord_guild_id,
+            clientSecret: settings.discord_client_secret
+        };
+    } catch (error) {
+        console.error('Failed to load Discord credentials from database:', error.message);
+        throw error;
+    }
+}
+
+// Register commands function
 async function registerCommands() {
     try {
-        // Get all command data properly
-        const commands = [
-            (await import('./commands/me.js')).data.toJSON(),
-            (await import('./commands/info.js')).data.toJSON(),
-            (await import('./commands/sync.js')).data.toJSON()
-        ];
-        console.log('Registering commands:', commands.map(c => c.name));
+        const credentials = await getDiscordCredentials();
+        const rest = new REST({ version: '10' }).setToken(credentials.token);
+
+        console.log(`Started refreshing ${commands.length} application (/) commands.`);
+
         await rest.put(
-            Routes.applicationCommands(client.user.id),
-            { body: commands }
+            Routes.applicationGuildCommands(credentials.clientId, credentials.guildId),
+            { body: commands },
         );
-        console.log('Commands registered successfully');
-    } catch (error) {
-        console.error('Command registration failed:', error);
-    }
-}
 
-async function syncAllMembers(guild) {
-    try {
-        const members = await guild.members.fetch();
-        let count = 0;
-        for (const [_, member] of members) {
-            await syncRoles(member);
-            count++;
+        console.log(`Successfully reloaded ${commands.length} application (/) commands.`);
+    } catch (error) {
+        console.error('Command registration failed:', error.message);
+
+        if (error.code === 50001) {
+            console.log('\n🔧 SOLUTION: Bot is missing access to register commands:');
+            console.log('1. Make sure the bot is added to your Discord server');
+            console.log('2. The bot needs "applications.commands" scope when being invited');
+            console.log('3. Go to Discord Developer Portal and re-invite with proper permissions');
+        } else if (error.code === 10002) {
+            console.log('\n🔧 SOLUTION: Unknown application - check your client ID in database');
         }
-        console.log(`Synced roles for ${count} members`);
-    } catch (error) {
-        console.error('Auto-sync error:', error);
     }
 }
 
+// Event listener for when the client is ready
 client.once('ready', async () => {
-    await initDatabase(); // Changed from initSheet() to initDatabase()
-    console.log(`Logged in as ${client.user.tag}!`);
-    const guild = client.guilds.cache.first();
-    if (guild) {
-        await initializeCoreRoles(guild);
-        console.log('System roles initialized');
-        
-        // Start auto-sync
-        syncInterval = setInterval(() => syncAllMembers(guild), 3600000); // Every hour
-    }
-    
-    client.user.setActivity({
-        name: 'phoenixclub.ro',
-        type: ActivityType.Watching
-    });
-    
+    console.log(`✅ Bot is online! Logged in as ${client.user.tag}`);
+
+    // Set bot activity
+    client.user.setActivity('Phoenix Club projects', { type: ActivityType.Watching });
+
+    // Register slash commands
     await registerCommands();
 });
 
-// Command handling remains the same as in your original file
+// Event listener for slash command interactions
 client.on('interactionCreate', async interaction => {
-    if (!interaction.isCommand()) return;
+    if (!interaction.isChatInputCommand()) return;
+
+    const command = client.commands.get(interaction.commandName);
+
+    if (!command) {
+        console.error(`No command matching ${interaction.commandName} was found.`);
+        return;
+    }
+
     try {
-        switch(interaction.commandName) {
-            case 'me':
-                await meCommand.execute(interaction);
-                break;
-            case 'info':
-                await infoCommand.execute(interaction);
-                break;
-            case 'sync':
-                await syncCommand.execute(interaction);
-                break;
-            default:
-                await interaction.reply({
-                    content: 'Comandă necunoscută',
-                    ephemeral: true
-                });
-        }
+        await command.execute(interaction);
     } catch (error) {
-        console.error('Command error:', error);
-        await interaction.reply({
-            content: 'A apărut o eroare',
-            ephemeral: true
-        });
+        console.error('Error executing command:', error);
+
+        const errorMessage = '❌ There was an error while executing this command!';
+
+        if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({ content: errorMessage, ephemeral: true });
+        } else {
+            await interaction.reply({ content: errorMessage, ephemeral: true });
+        }
     }
 });
 
-client.on('messageCreate', messageCreate);
-
-// Cleanup on shutdown
-process.on('SIGINT', () => {
-    clearInterval(syncInterval);
-    client.destroy();
+// Error handling
+process.on('unhandledRejection', error => {
+    console.error('Unhandled promise rejection:', error);
 });
 
-client.login(process.env.TOKEN);
+process.on('uncaughtException', error => {
+    console.error('Uncaught exception:', error);
+    process.exit(1);
+});
+
+// Login to Discord
+async function startBot() {
+    try {
+        console.log('🔄 Starting Discord bot...');
+
+        // Connect to database first
+        await connectToDatabase();
+        console.log('✅ Database connection established');
+
+        // Get credentials from database
+        const credentials = await getDiscordCredentials();
+
+        console.log('🔑 Discord credentials loaded from database');
+        console.log(`🆔 Client ID: ${credentials.clientId}`);
+        console.log(`🏠 Guild ID: ${credentials.guildId}`);
+        console.log(`🔐 Client Secret: ${credentials.clientSecret ? 'Set' : 'Not set'}`);
+
+        await client.login(credentials.token);
+    } catch (error) {
+        console.error('❌ Failed to start bot:', error.message);
+
+        if (error.message.includes('disallowed intents')) {
+            console.log('\n🔧 SOLUTION: Go to Discord Developer Portal:');
+            console.log('1. Visit https://discord.com/developers/applications');
+            console.log('2. Select your bot application');
+            console.log('3. Go to the "Bot" section');
+            console.log('4. Under "Privileged Gateway Intents", enable:');
+            console.log('   - Server Members Intent');
+            console.log('5. Save changes and restart the bot');
+        } else if (error.message.includes('token') || error.message.includes('credentials')) {
+            console.log('\n🔧 SOLUTION: Update Discord credentials in database:');
+            console.log('1. Check your database settings table');
+            console.log('2. Ensure these settings exist with correct values:');
+            console.log('   - discord_bot_token');
+            console.log('   - discord_client_id');
+            console.log('   - discord_guild_id');
+            console.log('   - discord_client_secret');
+            console.log('3. Get new values from Discord Developer Portal if needed');
+        } else if (error.message.includes('database')) {
+            console.log('\n🔧 SOLUTION: Check database connection:');
+            console.log('1. Ensure MySQL/MariaDB is running');
+            console.log('2. Check database credentials in .env file');
+            console.log('3. Ensure database "s41_phoenix" exists and is accessible');
+        }
+
+        process.exit(1);
+    }
+}
+
+startBot();
