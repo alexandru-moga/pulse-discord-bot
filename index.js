@@ -2,6 +2,7 @@ const { Client, Collection, GatewayIntentBits, REST, Routes, ActivityType } = re
 const fs = require('fs');
 const path = require('path');
 const { connectToDatabase, getConnection } = require('./config/database');
+const BotAPI = require('./api/server');
 require('dotenv').config();
 
 // Create a new client instance with only the necessary intents
@@ -31,6 +32,26 @@ for (const file of commandFiles) {
         console.log(`Loaded command: ${command.data.name}`);
     } else {
         console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+    }
+}
+
+// Load events
+const eventsPath = path.join(__dirname, 'events');
+const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+
+for (const file of eventFiles) {
+    const filePath = path.join(eventsPath, file);
+    const event = require(filePath);
+
+    if (event.name && typeof event.execute === 'function') {
+        if (event.once) {
+            client.once(event.name, (...args) => event.execute(...args));
+        } else {
+            client.on(event.name, (...args) => event.execute(...args));
+        }
+        console.log(`Loaded event: ${event.name}`);
+    } else {
+        console.log(`[WARNING] The event at ${filePath} is missing a required "name" or "execute" property.`);
     }
 }
 
@@ -110,30 +131,51 @@ client.once('ready', async () => {
 
     // Register slash commands
     await registerCommands();
+
+    // Start API server
+    const botAPI = new BotAPI(client);
+    botAPI.start();
 });
 
-// Event listener for slash command interactions
+// Event listener for interactions (commands and buttons)
 client.on('interactionCreate', async interaction => {
-    if (!interaction.isChatInputCommand()) return;
+    // Handle slash commands
+    if (interaction.isChatInputCommand()) {
+        const command = client.commands.get(interaction.commandName);
 
-    const command = client.commands.get(interaction.commandName);
+        if (!command) {
+            console.error(`No command matching ${interaction.commandName} was found.`);
+            return;
+        }
 
-    if (!command) {
-        console.error(`No command matching ${interaction.commandName} was found.`);
-        return;
+        try {
+            await command.execute(interaction);
+        } catch (error) {
+            console.error('Error executing command:', error);
+
+            const errorMessage = '❌ There was an error while executing this command!';
+
+            if (interaction.replied || interaction.deferred) {
+                await interaction.followUp({ content: errorMessage, ephemeral: true });
+            } else {
+                await interaction.reply({ content: errorMessage, ephemeral: true });
+            }
+        }
     }
-
-    try {
-        await command.execute(interaction);
-    } catch (error) {
-        console.error('Error executing command:', error);
-
-        const errorMessage = '❌ There was an error while executing this command!';
-
-        if (interaction.replied || interaction.deferred) {
-            await interaction.followUp({ content: errorMessage, ephemeral: true });
-        } else {
-            await interaction.reply({ content: errorMessage, ephemeral: true });
+    // Handle button interactions (verification buttons)
+    else if (interaction.isButton()) {
+        // Load the interactionCreate event handler
+        try {
+            const buttonHandler = require('./events/interactionCreate');
+            await buttonHandler.execute(interaction);
+        } catch (error) {
+            console.error('Error handling button interaction:', error);
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({
+                    content: '❌ An error occurred while processing your request.',
+                    ephemeral: true
+                });
+            }
         }
     }
 });
