@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { connectToDatabase, getConnection } = require('./config/database');
 const BotAPI = require('./api/server');
+const AutoRoleSyncService = require('./services/autoRoleSync');
 require('dotenv').config();
 
 // Create a new client instance with only the necessary intents
@@ -135,6 +136,19 @@ client.once('ready', async () => {
     // Start API server
     const botAPI = new BotAPI(client);
     botAPI.start();
+
+    // Start auto role sync service
+    try {
+        const autoRoleSync = new AutoRoleSyncService(client);
+        await autoRoleSync.start();
+        
+        // Make it globally accessible for potential manual control
+        client.autoRoleSync = autoRoleSync;
+    } catch (error) {
+        console.error('❌ Failed to start auto role sync service:', error);
+        console.log('   Bot will continue without automatic role syncing');
+        console.log('   Use /sync or /sync-all commands for manual syncing');
+    }
 });
 
 // Event listener for interactions (commands and buttons)

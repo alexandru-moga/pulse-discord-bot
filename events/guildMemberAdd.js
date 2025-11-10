@@ -45,7 +45,7 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setColor('#7289da')
                 .setTitle('🛡️ Link Your Discord Account')
-                .setDescription(`Welcome ${member.user.tag}! To access Phoenix Club features, please link your Discord account.`)
+                .setDescription('Welcome to Phoenix Club! To access all features, please link your Discord account.')
                 .addFields(
                     {
                         name: '🔐 How to Link',
@@ -58,7 +58,6 @@ module.exports = {
                         inline: false
                     }
                 )
-                .setThumbnail(member.user.displayAvatarURL())
                 .setFooter({
                     text: 'Phoenix Club • Click the button below to get started',
                     iconURL: member.guild.iconURL()
@@ -74,7 +73,7 @@ module.exports = {
                 .addComponents(verifyButton);
 
             await welcomeChannel.send({
-                content: `${member}, welcome to Phoenix Club! Please link your Discord account to get started. 🚀`,
+                content: `Welcome to Phoenix Club! Please link your Discord account to get started. 🚀`,
                 embeds: [embed],
                 components: [actionRow]
             });

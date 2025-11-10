@@ -41,7 +41,7 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setColor('#00ff88')
                 .setTitle('🎉 Welcome to Phoenix Club!')
-                .setDescription(`Hey ${targetUser.tag}! Welcome to our community! 🚀`)
+                .setDescription('Welcome to our community! 🚀')
                 .addFields(
                     {
                         name: '🔗 Link Your Account',
@@ -59,7 +59,6 @@ module.exports = {
                         inline: false
                     }
                 )
-                .setThumbnail(targetUser.displayAvatarURL())
                 .setFooter({ 
                     text: 'Phoenix Club • Link your account to get started',
                     iconURL: interaction.guild.iconURL()
@@ -75,7 +74,7 @@ module.exports = {
                 .addComponents(linkButton);
             
             await targetChannel.send({
-                content: `Welcome ${targetUser}! 👋`,
+                content: `Welcome to Phoenix Club! 👋`,
                 embeds: [embed],
                 components: [actionRow]
             });
